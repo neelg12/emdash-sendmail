@@ -13,7 +13,7 @@ function createPlugin(options = {}) {
   });
   return definePlugin({
     id: "sendmail-transport",
-    version: "1.0.0",
+    version: "1.0.1",
     capabilities: ["hooks.email-transport:register"],
     hooks: {
       "plugin:activate": {

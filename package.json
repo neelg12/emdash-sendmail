@@ -1,6 +1,6 @@
 {
   "name": "@incsub/emdash-sendmail",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Email transport plugin for EmDash CMS on WPMU DEV Hosting. Routes mail through the local sendmail binary; the host MTA rewrites sender headers to noreply@yourwpsite.email and relays via MailChannels. Zero config — install, rebuild, done.",
   "type": "module",
   "exports": {

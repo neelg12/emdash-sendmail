@@ -33,7 +33,7 @@ The standard WPMU DEV Hosting install flow — edit `package.json` on the server
 
    ```diff
      "dependencies": {
-   +   "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v1.0.0"
+   +   "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v1.0.1"
      }
    ```
 
@@ -63,7 +63,7 @@ The standard WPMU DEV Hosting install flow — edit `package.json` on the server
 ### Local development
 
 ```bash
-npm install github:neelg12/emdash-sendmail#v1.0.0
+npm install github:neelg12/emdash-sendmail#v1.0.1
 ```
 
 Then wire into `astro.config.mjs` and restart `npx emdash dev`. For development against an in-progress copy of the plugin:

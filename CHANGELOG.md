@@ -5,6 +5,12 @@ All notable changes to `@incsub/emdash-sendmail` (maintained by [WPMU DEV](https
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-05-20
+
+### Fixed
+
+- **Patch bump to bust stale `package-lock.json` / npm cache pins** on WPMU DEV Hosting after the 1.0.0 release. Some sites that previously had 0.3.x installed kept resolving to the older SHA via lockfile pinning even after bumping the `package.json` GitHub ref to `#v1.0.0`. No code changes beyond the version string — 1.0.1 is byte-identical to 1.0.0 in behaviour.
+
 ## [1.0.0] — 2026-05-20
 
 **Production release.** The plugin has been verified end-to-end on WPMU DEV Hosting (`emdash@0.11.1` + `@emdash-cms/template-portfolio@0.0.3`). A real test email round-tripped through `/usr/sbin/sendmail` → Postfix (`Ffs` header rewrite to `noreply@yourwpsite.email`) → MailChannels → Gmail with **SPF pass, DKIM pass, and DMARC pass (`p=REJECT`, strict)**. No deliverability blemishes.
@@ -81,6 +87,7 @@ Pre-release. Introduced `forceFrom`, `messageIdDomain`, startup validation, and 
 
 Initial release. Sendmail + SMTP transports with `defaultFrom` option. Superseded by 0.3.0.
 
+[1.0.1]: https://github.com/neelg12/emdash-sendmail/releases/tag/v1.0.1
 [1.0.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v1.0.0
 [0.3.1]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.3.1
 [0.3.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.3.0
