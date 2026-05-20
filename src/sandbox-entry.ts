@@ -41,7 +41,7 @@ export function createPlugin(options: SendmailPluginOptions = {}) {
 
   return definePlugin({
     id: "sendmail-transport",
-    version: "0.3.0",
+    version: "0.3.1",
     capabilities: ["hooks.email-transport:register"],
 
     hooks: {

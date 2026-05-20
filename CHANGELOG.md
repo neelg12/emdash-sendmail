@@ -5,6 +5,12 @@ All notable changes to `@incsub/emdash-sendmail` (maintained by [WPMU DEV](https
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-20
+
+### Fixed
+
+- **`peerDependencies.emdash` lowered from `>=0.13.0` back to `>=0.11.0`** to match the version range that's actually shipped via WPMU DEV Hosting templates (e.g. `@emdash-cms/template-portfolio@0.0.3` pins `emdash@^0.11.1`). 0.3.0's tighter range caused `npm install` to fail on those templates with an `ERESOLVE` peer-conflict error during Hub Rebuild. The email pipeline / `email:deliver` exclusive hook is available in 0.11.x — verified empirically (0.1.0 with the same lower peer range successfully delivered mail on `emdash@0.11.1`), so the looser range is correct. Apologies for the noise.
+
 ## [0.3.0] — 2026-05-20
 
 Stable release. The plugin is now scoped explicitly to **WPMU DEV Hosting** and built around the host MTA's behaviour. Configuration surface reduced to a single optional field; the rest is hard-coded to what actually works on the target environment.
@@ -51,6 +57,7 @@ Pre-release. Introduced `forceFrom`, `messageIdDomain`, startup validation, and 
 
 Initial release. Sendmail + SMTP transports with `defaultFrom` option. Superseded by 0.3.0.
 
+[0.3.1]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.3.1
 [0.3.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.3.0
 [0.2.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.2.0
 [0.1.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.1.0

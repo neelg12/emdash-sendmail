@@ -2,7 +2,7 @@
 function sendmailPlugin(options = {}) {
   return {
     id: "sendmail-transport",
-    version: "0.3.0",
+    version: "0.3.1",
     // Native format — nodemailer depends on Node `child_process`, which
     // doesn't exist in the sandboxed V8 isolate runtime.
     format: "native",
