@@ -1,75 +1,44 @@
 /**
  * Public options for `sendmailPlugin(options)`.
  *
- * All fields are optional with sensible defaults. The most common knob is
- * `transport` — flip between "sendmail" and "smtp" to match what the host
- * actually permits.
+ * All fields are optional. On WPMU DEV Hosting the defaults work — most
+ * sites call `sendmailPlugin()` with no arguments.
  */
 export interface SendmailPluginOptions {
   /**
-   * Which underlying transport to use.
+   * Absolute path to the sendmail binary. Default: `/usr/sbin/sendmail`.
    *
-   * - `"sendmail"` (default): spawn `/usr/sbin/sendmail -t` and pipe the
-   *   message in over stdin. Same path PHP `mail()` uses on most shared
-   *   hosts (including WPMU DEV Hosting). Works whenever the Node process
-   *   has exec permissions on the sendmail binary — which is typical even
-   *   when the SSH shell user is restricted.
-   *
-   * - `"smtp"`: connect to a local (or remote) SMTP relay. Useful if the
-   *   host blocks process spawning but exposes Postfix/Exim on localhost.
-   *   Configure via `smtp.host` / `smtp.port` / `smtp.auth`.
+   * Override only if your host puts sendmail somewhere non-standard. On
+   * WPMU DEV Hosting you never need to set this.
    */
-  transport?: "sendmail" | "smtp";
-
-  /**
-   * Fallback `From:` address used when an `email:send` call doesn't supply
-   * one. Should match a domain your relay (e.g. MailChannels) is
-   * configured to send for, otherwise mail will be rejected.
-   *
-   * Example: `"no-reply@yourdomain.com"`
-   */
-  defaultFrom?: string;
-
-  /**
-   * Sendmail-specific options (only used when `transport === "sendmail"`).
-   */
-  sendmail?: {
-    /** Absolute path to the sendmail binary. Default: `/usr/sbin/sendmail`. */
-    path?: string;
-    /** Line-ending style for the message. Default: `"unix"`. */
-    newline?: "unix" | "windows";
-  };
-
-  /**
-   * SMTP-specific options (only used when `transport === "smtp"`).
-   */
-  smtp?: {
-    /** SMTP host. Default: `"localhost"`. */
-    host?: string;
-    /** SMTP port. Default: `25`. */
-    port?: number;
-    /** Whether the connection should start in TLS. Default: `false`. */
-    secure?: boolean;
-    /** Optional SMTP auth (host-dependent — usually not needed for localhost). */
-    auth?: { user: string; pass: string };
-    /**
-     * Reject self-signed / mismatched certs. Default: `false` — many
-     * local relays use self-signed certs and we trust localhost.
-     */
-    rejectUnauthorized?: boolean;
-  };
+  sendmailPath?: string;
 }
 
 /**
- * Shape of a single outgoing message as EmDash hands it to our transport
- * via the `email:deliver` hook. Mirrors core's `EmailMessage` interface
- * but kept here so we don't depend on private core types.
+ * Shape of a single outgoing message as EmDash hands it to the
+ * `email:deliver` hook. Mirrors core's `EmailMessage` interface
+ * (`packages/core/src/plugins/types.ts`) — kept here so we don't take a
+ * compile-time dependency on a private core type.
+ *
+ * Note: there is intentionally NO `from` field. EmDash core does not let
+ * callers (or transports) specify the sender at the message level — the
+ * From: header is whatever the underlying MTA decides. On WPMU DEV
+ * Hosting that's `noreply@yourwpsite.email`, enforced via a Postfix
+ * rewrite rule (`*@* noreply@yourwpsite.email Ffs`).
  */
 export interface EmailMessage {
-  to: string | string[];
+  to: string;
   subject: string;
-  text?: string;
+  text: string;
   html?: string;
-  from?: string;
-  replyTo?: string;
+}
+
+/**
+ * Event payload for the `email:deliver` hook. Includes a `source`
+ * identifier so transports can log which subsystem fired the send
+ * (e.g. `"auth/magic-link"`, `"auth/invite"`, `"admin"`, `"plugin:<id>"`).
+ */
+export interface EmailDeliverEvent {
+  message: EmailMessage;
+  source: string;
 }

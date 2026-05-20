@@ -1,8 +1,8 @@
 import { PluginDescriptor } from 'emdash';
-import { S as SendmailPluginOptions } from './types-BUbGAF9K.js';
+import { S as SendmailPluginOptions } from './types-wtOVrDoM.js';
 
 /**
- * Build the EmDash plugin descriptor for the sendmail email transport.
+ * Build the EmDash plugin descriptor for the WPMU DEV sendmail transport.
  *
  * Add to your `astro.config.mjs`:
  *
@@ -10,20 +10,19 @@ import { S as SendmailPluginOptions } from './types-BUbGAF9K.js';
  * import { sendmailPlugin } from "@incsub/emdash-sendmail";
  *
  * emdash({
- *   plugins: [
- *     sendmailPlugin({
- *       transport: "sendmail",                    // or "smtp"
- *       defaultFrom: "no-reply@yourdomain.com",
- *     }),
- *   ],
+ *   plugins: [sendmailPlugin()],
  * });
  * ```
  *
- * After Hub Rebuild, go to **Admin → Settings → Email** and select
- * **Sendmail Transport** as the active provider.
+ * Then click **Rebuild** in the WPMU DEV Hub. EmDash auto-selects the
+ * plugin as the active email transport (it's the only one installed), so
+ * no further admin action is required — invites, magic links, and any
+ * plugin's `ctx.email.send()` call flow through `/usr/sbin/sendmail` →
+ * MailChannels immediately after restart.
  *
- * Options are forwarded to `createPlugin` at runtime — they control which
- * transport gets wired into the `email:deliver` exclusive hook.
+ * The single available option is `sendmailPath`, an escape hatch for
+ * hosts where the binary lives somewhere other than `/usr/sbin/sendmail`.
+ * On WPMU DEV Hosting you don't need it.
  */
 declare function sendmailPlugin(options?: SendmailPluginOptions): PluginDescriptor<SendmailPluginOptions>;
 

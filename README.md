@@ -2,35 +2,36 @@
 
 > Built and maintained by [WPMU DEV](https://wpmudev.com).
 
-An email transport plugin for [EmDash CMS](https://emdash.dev). Routes outgoing mail through the host's local `sendmail` binary (or a localhost SMTP relay) — the same path PHP `mail()` uses on most shared hosting, including WPMU DEV Hosting. If WordPress emails work on your server, this plugin makes EmDash emails work the same way.
+An email transport plugin for [EmDash CMS](https://emdash.dev), scoped to **WPMU DEV Hosting**. Routes outgoing mail through the local `sendmail` binary; the host's MTA rewrites sender headers and relays via MailChannels. Zero configuration — install, rebuild, done.
 
-> **Why this plugin exists.** EmDash ships an email pipeline but no production transport — out of the box, calls to `ctx.email.send(...)` throw `EmailNotConfiguredError`, and magic-link / invite / signup flows silently degrade. This plugin fills that gap with the simplest possible transport that works on a shared host.
+If WordPress emails work on your WPMU DEV server, EmDash emails work the same way after installing this plugin.
 
 ---
 
-## Features
+## Why this plugin exists
 
-- **Registers as the active EmDash email transport** via the `email:deliver` exclusive hook
-- **Two transports**, switchable via one config line:
-  - `sendmail` (default) — spawns `/usr/sbin/sendmail -t`, the same way PHP `mail()` does
-  - `smtp` — connects to a localhost (or remote) SMTP relay
-- **Structured logging** — every send logs through `ctx.log` so failures are visible in the Hub logs
-- **Zero external runtime dependencies** beyond `nodemailer`
-- **Same trust path as PHP `mail()`** — if your host's WordPress emails reach the inbox, so do EmDash's
+EmDash ships an email pipeline but no production transport. Out of the box, calls to `ctx.email.send(...)` throw `EmailNotConfiguredError`, and magic-link / invite / signup flows silently degrade. This plugin fills the gap with the simplest possible transport that works on WPMU DEV's stack.
+
+## What it does
+
+- Registers as the active EmDash email transport via the `email:deliver` exclusive hook
+- Hands every outgoing message to `/usr/sbin/sendmail -t` via [nodemailer](https://nodemailer.com)
+- Lets the WPMU DEV MTA handle sender identity, SPF/DKIM/DMARC alignment, and MailChannels relaying — none of that is configured in the plugin
+- Logs every send (success and failure) through EmDash's `ctx.log` so issues show up in the Hub server logs
+
+That's the whole plugin. ~40 lines of real code, one optional config field, no admin UI.
 
 ---
 
 ## Install
 
-### On WPMU DEV Hosting (recommended workflow)
-
-You can't run `npm install` directly over SSH on locked-down shared hosting. The proper flow is to **edit `package.json` on the server, then click Rebuild in the Hub**, which runs `npm install + npm run build + restart` with the right permissions. Same pattern as the [Contact Form plugin install guide](https://wpmudev.com/docs/hosting/unlimited/#emdash-contact-form-install).
+The standard WPMU DEV Hosting install flow — edit `package.json` on the server, then click **Rebuild** in the Hub.
 
 1. SSH into your hosting and edit `package.json` in your EmDash site root:
 
    ```diff
      "dependencies": {
-   +   "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v0.1.0"
+   +   "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v0.3.0"
      }
    ```
 
@@ -47,30 +48,23 @@ You can't run `npm install` directly over SSH on locked-down shared hosting. The
      integrations: [
        emdash({
          database: sqlite({ url: "file:./data.db" }),
-         plugins: [
-           sendmailPlugin({
-             transport: "sendmail",                    // try this first
-             defaultFrom: "no-reply@yourdomain.com",   // must be on an allowed sending domain
-           }),
-         ],
+         plugins: [sendmailPlugin()],
        }),
      ],
    });
    ```
 
-3. **Click Rebuild in the WPMU DEV Hub.** This installs the package and restarts the EmDash app.
+3. **Click Rebuild in the WPMU DEV Hub.** This runs `npm install + npm run build + restart` with the right permissions.
 
-4. Open the admin UI → **Settings → Email** → select **Sendmail Transport** as the active provider.
-
-5. Trigger a real email — invite a user, request a magic-link login, or use Settings → Email → "Send test email" if your EmDash version exposes that button. The mail should arrive within seconds via the same MailChannels relay WordPress uses.
+4. That's it. EmDash auto-selects the plugin as the active email transport (it's the only one installed), so no further admin action is needed. Send a test from **Admin → Settings → Email** to verify.
 
 ### Local development
 
 ```bash
-npm install github:neelg12/emdash-sendmail#v0.1.0
+npm install github:neelg12/emdash-sendmail#v0.3.0
 ```
 
-Then wire into `astro.config.mjs` and restart `npx emdash dev`. For local development against an in-progress copy of the plugin:
+Then wire into `astro.config.mjs` and restart `npx emdash dev`. For development against an in-progress copy of the plugin:
 
 ```bash
 npm install file:../path/to/emdash-sendmail
@@ -87,96 +81,69 @@ npm install file:../path/to/emdash-sendmail
 
 ---
 
-## Plugin options
+## Configuration
+
+There is one optional field, and most sites don't need it:
 
 ```ts
 sendmailPlugin({
-  transport: "sendmail",                   // "sendmail" (default) | "smtp"
-  defaultFrom: "no-reply@yourdomain.com",  // fallback From: address
-  sendmail: {
-    path: "/usr/sbin/sendmail",            // absolute path; override if non-standard
-    newline: "unix",                       // "unix" | "windows"
-  },
-  smtp: {
-    host: "localhost",                     // SMTP host
-    port: 25,                              // SMTP port
-    secure: false,                         // start in TLS?
-    auth: { user: "...", pass: "..." },    // only if your relay requires it
-    rejectUnauthorized: false,             // verify TLS cert chain
-  },
-})
+  sendmailPath: "/usr/sbin/sendmail",   // default — only set if your host puts the binary elsewhere
+});
 ```
 
-All fields are optional. `transport: "sendmail"` with `defaultFrom` set to your domain's no-reply address is enough for most WPMU DEV Hosting setups.
+**You won't need to set anything else.** Sender identity (From: / envelope sender / Sender: / SPF / DKIM / DMARC) is handled entirely by the WPMU DEV MTA — the plugin deliberately leaves all of it alone so the host can do its job.
 
----
-
-## Picking a transport
-
-| Situation | Use |
-| --- | --- |
-| WPMU DEV Hosting (default) | `sendmail` |
-| WordPress emails on the same server work via `mail()` | `sendmail` |
-| Host blocks process spawning but has a local Postfix/Exim | `smtp` (host `localhost`, port `25`) |
-| Host provides a remote SMTP relay (e.g. dedicated relay box) | `smtp` with host/port/auth set |
-| External SMTP service (Mailgun, SES, Postmark) | `smtp` with credentials |
-
-If you're unsure which one your host permits, start with `sendmail`. If sends fail with `EACCES` / `ENOENT` / "permission denied" in the Hub logs, flip the config to `smtp` and click Rebuild — no other change needed.
+> **What about the From: address?** WPMU DEV's Postfix rewrite rule `*@* noreply@yourwpsite.email Ffs` rewrites three things on every outgoing message: the visible `From:` header, the envelope sender, and the `Sender:` header. All outgoing mail will show as coming from `noreply@yourwpsite.email`, regardless of anything the plugin does. This is by design — it guarantees SPF / DKIM alignment with the relay. If you need a different sender address, ask your hosting support; it isn't something the plugin can override.
 
 ---
 
 ## How sends flow
 
 ```
-caller (auth, invite, plugin)
+caller (auth, invite, plugin, admin test-send)
    │
-   ▼  ctx.email.send({ to, subject, text, ... })
+   ▼  ctx.email.send({ to, subject, text, html? })
 EmailPipeline (EmDash core)
-   │  ├─ runs all `email:beforeSend` hooks
+   │  ├─ email:beforeSend hooks (other plugins can transform / cancel)
    │  ▼
-   │  email:deliver  ◀── this plugin
+   │  email:deliver  ◀── this plugin (exclusive)
    │     │
-   │     ├─ "sendmail" → spawn /usr/sbin/sendmail -t → MailChannels (or your MTA)
-   │     └─ "smtp"     → connect localhost:25 → MailChannels (or your MTA)
+   │     └─ /usr/sbin/sendmail -t  →  Postfix (rewrites headers)  →  MailChannels  →  recipient
    │
-   └─ runs all `email:afterSend` hooks
+   └─ email:afterSend hooks (other plugins can log / retry / fire webhooks)
 ```
 
-EmDash's `email:beforeSend` and `email:afterSend` hooks are still available for other plugins to layer on logging, rate-limiting, retries, or analytics — this plugin only claims the `email:deliver` slot.
+EmDash's `email:beforeSend` and `email:afterSend` hooks remain available for layered behaviour from other plugins; this plugin only claims the `email:deliver` slot.
 
 ---
+
+## Verifying it works
+
+After install + Rebuild:
+
+1. Go to **Admin → Settings → Email**. The active provider should show as **sendmail-transport**.
+2. Send a test email from that page. It should arrive within seconds with `From: noreply@yourwpsite.email`.
+3. Tail the Hub server logs while sending — you'll see one `[emdash-sendmail] delivered ...` entry per send.
 
 ## Troubleshooting
 
-Email not arriving? In rough order of likelihood on a shared host:
+If sends fail, the Hub logs will show one `[emdash-sendmail] delivery FAILED ...` line per attempt with the underlying nodemailer error code. The two failures you might realistically see on WPMU DEV Hosting:
 
-1. **`EACCES` on the sendmail binary** — Node process can't exec `/usr/sbin/sendmail`. Flip `transport: "smtp"` and Rebuild.
-2. **`ENOENT` on the sendmail binary** — sendmail is somewhere other than `/usr/sbin/sendmail`. Set `sendmail.path` to the actual path (ask your host).
-3. **`ECONNREFUSED` on localhost:25** — local SMTP isn't running, or isn't listening on that port. Ask your host for the SMTP relay address.
-4. **Message accepted by the local MTA but never delivered** — the upstream relay (MailChannels) rejected the message, usually because the `From:` domain isn't on the allowed-senders list. Use a `defaultFrom` on your real domain, not a placeholder.
-5. **Plugin not selected as active provider** — go to Settings → Email and pick **Sendmail Transport** explicitly. EmDash refuses to auto-pick a transport in production.
+| Code | What it means | What to do |
+| --- | --- | --- |
+| `ENOENT` | `/usr/sbin/sendmail` not at that path | Set `sendmailPath` in plugin options to the actual location; ask hosting support if unsure |
+| `EACCES` | Node process can't exec sendmail | Contact WPMU DEV support — this shouldn't happen on standard hosting |
 
-Every send (success or failure) logs via `ctx.log` with the transport name and underlying error code. Check the Hub's server logs for `[emdash-sendmail]` entries to see what actually happened.
-
----
-
-## Privacy & security
-
-| Concern | Mitigation |
-| --- | --- |
-| **No-auth localhost SMTP relay** | Default — relies on the relay accepting only loopback connections (standard for shared-host Postfix/Exim). Override `smtp.auth` if your relay requires creds |
-| **`From:` spoofing** | The plugin trusts whatever `from` value EmDash hands it; EmDash callers should pre-validate. Set `defaultFrom` to a domain you control so callers that omit `from` can't slip through |
-| **TLS cert validation** | `rejectUnauthorized` defaults to `false` because many local relays use self-signed certs. Set to `true` if connecting to a remote SMTP service with proper certs |
-| **Log content** | Subject lines and recipient addresses are logged at `info`; message bodies are NOT logged |
+Anything else (relay rejections, message-deferred warnings, etc.) is happening downstream of the plugin and is a hosting / MTA / MailChannels matter.
 
 ---
 
 ## Limitations
 
-1. **Single transport at a time** — EmDash's `email:deliver` is `exclusive`, so only one provider plugin can be active. Don't enable both this and another email plugin.
-2. **No retry / queue** — failed sends throw to the caller. Pair with a separate `email:afterSend` retry plugin if you need durability.
-3. **No HTTP-API transports** (MailChannels HTTP, Resend, SendGrid). Out of scope for v0.1.
-4. **Trusted (native) format only** — this plugin uses `nodemailer`, which depends on Node's `net` and `child_process`. It can't run in EmDash's sandboxed V8 isolate runtime.
+1. **WPMU DEV Hosting only.** The defaults assume the host MTA rewrites sender headers. On other hosts, mail will go out with no `From:` header and most relays will reject it. Forks are welcome — see `src/sandbox-entry.ts`.
+2. **Single transport at a time.** EmDash's `email:deliver` is exclusive — only one provider plugin can be active. Don't enable this alongside another email plugin.
+3. **No retry / queue.** Failed sends throw to the caller. Pair with a separate `email:afterSend` retry plugin if you need durability.
+4. **Native plugin only.** Uses nodemailer + Node `child_process`; can't run in EmDash's sandboxed V8 isolate runtime.
 
 ---
 
@@ -201,7 +168,7 @@ The compiled `dist/` is **committed to git** so GitHub installs work without nee
 
 ## Made by
 
-[WPMU DEV](https://wpmudev.com) — we build managed-hosting and WordPress tooling used by 100k+ agencies. This plugin is part of our exploration of EmDash CMS. Questions, bug reports, or feature requests welcome at [github.com/neelg12/emdash-sendmail/issues](https://github.com/neelg12/emdash-sendmail/issues).
+[WPMU DEV](https://wpmudev.com) — managed hosting and WordPress tooling used by 100k+ agencies. This plugin is part of our exploration of EmDash CMS. Questions, bug reports, or feature requests welcome at [github.com/neelg12/emdash-sendmail/issues](https://github.com/neelg12/emdash-sendmail/issues).
 
 ---
 

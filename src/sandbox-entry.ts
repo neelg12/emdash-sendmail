@@ -2,17 +2,26 @@
  * EmDash Sendmail Transport — sandbox entrypoint.
  *
  * EmDash's native plugin loader imports `createPlugin` from this module at
- * runtime and calls it with the plugin descriptor's options. The function
- * returns a fully-resolved plugin definition that registers an exclusive
- * `email:deliver` hook — making this plugin the active email transport
- * for the whole EmDash site.
+ * runtime and calls it with the descriptor's options. The function returns
+ * a fully-resolved plugin definition that registers an exclusive
+ * `email:deliver` hook, making this plugin THE active email transport for
+ * the whole EmDash site.
+ *
+ * Scope: built and tested for WPMU DEV Hosting, whose Postfix MTA rewrites
+ * From: / envelope-sender / Sender: headers to `noreply@yourwpsite.email`
+ * and relays out via MailChannels. That means this plugin does the
+ * absolute minimum:
+ *
+ *   1. Hand the message to `/usr/sbin/sendmail -t` over stdin
+ *   2. Log success / failure
+ *
+ * No address config, no transport modes, no validation — because none of
+ * it would change the bytes that hit the recipient's inbox on this host.
  */
 import { definePlugin } from "emdash";
 import type { PluginContext } from "emdash";
-import type { Transporter } from "nodemailer";
-import type { EmailMessage, SendmailPluginOptions } from "./types.js";
-import { createSendmailTransport } from "./transports/sendmail.js";
-import { createSmtpTransport } from "./transports/smtp.js";
+import nodemailer from "nodemailer";
+import type { EmailDeliverEvent, SendmailPluginOptions } from "./types.js";
 
 /**
  * Build the transport plugin. Called by EmDash at runtime via:
@@ -20,106 +29,69 @@ import { createSmtpTransport } from "./transports/smtp.js";
  *   createPlugin(descriptor.options);
  */
 export function createPlugin(options: SendmailPluginOptions = {}) {
-  // Build the transporter once, eagerly, so the cost is paid at plugin
-  // activate time rather than on every send. Both transports are cheap to
-  // construct — they don't open sockets / spawn processes until sendMail
-  // is invoked.
-  let transporter: Transporter;
-  try {
-    transporter =
-      options.transport === "smtp"
-        ? createSmtpTransport(options.smtp)
-        : createSendmailTransport(options.sendmail);
-  } catch (e) {
-    // If even constructing the transporter fails we want to surface that
-    // clearly in EmDash logs rather than silently swallowing it. Re-throw
-    // so the plugin fails to load with a visible error.
-    throw new Error(
-      `[emdash-sendmail] Failed to construct transporter (transport="${
-        options.transport ?? "sendmail"
-      }"): ${(e as Error).message}`,
-    );
-  }
+  const sendmailPath = options.sendmailPath ?? "/usr/sbin/sendmail";
+
+  // Construct the nodemailer transporter once at plugin load. Cheap — no
+  // process is spawned until sendMail() is invoked.
+  const transporter = nodemailer.createTransport({
+    sendmail: true,
+    newline: "unix",
+    path: sendmailPath,
+  });
 
   return definePlugin({
-    // ─────────────────────────────────────────────────────────────────────
-    // Native-format identity fields (required so definePlugin returns a
-    // ResolvedPlugin rather than a StandardPluginDefinition).
-    // ─────────────────────────────────────────────────────────────────────
     id: "sendmail-transport",
-    version: "0.1.0",
-    // We register the email-deliver hook — EmDash gates that behind this
-    // capability.
+    version: "0.3.0",
     capabilities: ["hooks.email-transport:register"],
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Hooks
-    // ─────────────────────────────────────────────────────────────────────
     hooks: {
       "plugin:activate": {
         handler: async (_event: unknown, ctx: PluginContext) => {
-          const transportName = options.transport ?? "sendmail";
           ctx.log.info(
-            `Sendmail Transport activated (transport="${transportName}", ` +
-              `defaultFrom="${options.defaultFrom ?? "<none>"}")`,
+            `[emdash-sendmail] activated (sendmailPath="${sendmailPath}")`,
           );
         },
       },
 
-      // The whole point of the plugin: register as THE email provider.
-      // `exclusive: true` means EmDash will refuse to load if another
-      // plugin tries to claim this slot — surfacing the conflict instead
-      // of silently picking one.
+      // Claim the exclusive transport slot. EmDash auto-selects us when
+      // we're the only provider, so no admin action is required after
+      // install — the plugin "just works" once activated.
       "email:deliver": {
         exclusive: true,
-        handler: async (
-          event: { message: EmailMessage },
-          ctx: PluginContext,
-        ) => {
-          const { message } = event;
-
-          // Resolve `from` — explicit message.from wins, then plugin
-          // defaultFrom, then a hard fallback. We don't want to surface
-          // nodemailer's cryptic "no from address" error to admins.
-          const from =
-            message.from ??
-            options.defaultFrom ??
-            "no-reply@localhost";
+        handler: async (event: EmailDeliverEvent, ctx: PluginContext) => {
+          const { message, source } = event;
 
           try {
             const info = await transporter.sendMail({
-              from,
               to: message.to,
               subject: message.subject,
               text: message.text,
               ...(message.html ? { html: message.html } : {}),
-              ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+              // Intentionally no `from`: the host MTA rewrites From: /
+              // envelope-sender / Sender: to `noreply@yourwpsite.email`
+              // via its rewrite rule. Setting from here would just be
+              // overwritten downstream.
             });
 
-            // nodemailer returns a SentMessageInfo with `messageId` /
-            // `response` — log it so admins can correlate with relay
-            // logs (MailChannels, Postfix, etc).
             ctx.log.info(
-              `Email delivered: to="${
-                Array.isArray(message.to) ? message.to.join(",") : message.to
-              }" ` +
+              `[emdash-sendmail] delivered ` +
+                `to="${message.to}" ` +
                 `subject="${message.subject}" ` +
+                `source="${source}" ` +
                 `messageId="${info.messageId ?? "<none>"}"`,
             );
           } catch (e) {
-            // Re-throw with a prefix so it's obvious in logs which plugin
-            // failed. EmDash's email pipeline will mark the send as
-            // failed and propagate to the caller.
             const err = e as Error & { code?: string };
             ctx.log.error(
-              `Email delivery FAILED via "${
-                options.transport ?? "sendmail"
-              }" transport: ${err.message}` +
-                (err.code ? ` (code=${err.code})` : ""),
+              `[emdash-sendmail] delivery FAILED ` +
+                `to="${message.to}" ` +
+                `source="${source}" ` +
+                `code="${err.code ?? "?"}" ` +
+                `message="${err.message}"`,
             );
-            throw new Error(
-              `[emdash-sendmail] delivery failed: ${err.message}`,
-            );
+            // Rethrow so EmDash's email pipeline marks the send as failed
+            // and surfaces it to the caller.
+            throw err;
           }
         },
       },
