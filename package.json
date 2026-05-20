@@ -1,0 +1,63 @@
+{
+  "name": "@incsub/emdash-sendmail",
+  "version": "0.1.0",
+  "description": "Email transport plugin for EmDash CMS — routes mail through the local sendmail binary or a localhost SMTP relay. Designed for shared hosting (e.g. WPMU DEV) where PHP mail() already works.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./sandbox": {
+      "types": "./dist/sandbox-entry.d.ts",
+      "import": "./dist/sandbox-entry.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.0"
+  },
+  "peerDependencies": {
+    "emdash": ">=0.9.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "emdash",
+    "emdash-plugin",
+    "cms",
+    "email",
+    "sendmail",
+    "smtp",
+    "nodemailer",
+    "mailchannels",
+    "wpmudev",
+    "wpmu-dev"
+  ],
+  "author": "WPMU DEV (Incsub) <https://wpmudev.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neelg12/emdash-sendmail.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neelg12/emdash-sendmail/issues"
+  },
+  "homepage": "https://github.com/neelg12/emdash-sendmail#readme",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+# Note: `dist/` IS committed for GitHub-distributed installs — consumers'
+# hosting may not be able to run `prepare` reliably, so we ship the built
+# output directly. Run `npm run build` before each release commit.
+build/
+*.tsbuildinfo
+
+# npm pack output
+*.tgz
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
