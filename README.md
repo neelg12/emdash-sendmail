@@ -6,6 +6,8 @@ An email transport plugin for [EmDash CMS](https://emdash.dev), scoped to **WPMU
 
 If WordPress emails work on your WPMU DEV server, EmDash emails work the same way after installing this plugin.
 
+**Verified in production:** Real round-trip on `emdash@0.11.1` delivered with **SPF pass, DKIM pass, DMARC pass (`p=REJECT`, strict alignment)** via MailChannels into Gmail. No deliverability blemishes.
+
 ---
 
 ## Why this plugin exists
@@ -31,7 +33,7 @@ The standard WPMU DEV Hosting install flow — edit `package.json` on the server
 
    ```diff
      "dependencies": {
-   +   "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v0.3.1"
+   +   "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v1.0.0"
      }
    ```
 
@@ -61,7 +63,7 @@ The standard WPMU DEV Hosting install flow — edit `package.json` on the server
 ### Local development
 
 ```bash
-npm install github:neelg12/emdash-sendmail#v0.3.1
+npm install github:neelg12/emdash-sendmail#v1.0.0
 ```
 
 Then wire into `astro.config.mjs` and restart `npx emdash dev`. For development against an in-progress copy of the plugin:
@@ -83,15 +85,16 @@ npm install file:../path/to/emdash-sendmail
 
 ## Configuration
 
-There is one optional field, and most sites don't need it:
+There are two optional fields. Most sites don't need either:
 
 ```ts
 sendmailPlugin({
-  sendmailPath: "/usr/sbin/sendmail",   // default — only set if your host puts the binary elsewhere
+  sendmailPath: "/usr/sbin/sendmail",     // default — only set if your host puts the binary elsewhere
+  messageIdDomain: "yourwpsite.email",    // default — matches the MTA's rewrite target
 });
 ```
 
-**You won't need to set anything else.** Sender identity (From: / envelope sender / Sender: / SPF / DKIM / DMARC) is handled entirely by the WPMU DEV MTA — the plugin deliberately leaves all of it alone so the host can do its job.
+**You won't need to set anything.** Sender identity (`From:` / envelope sender / `Sender:` / SPF / DKIM / DMARC) is handled entirely by the WPMU DEV MTA — the plugin deliberately leaves all of it alone so the host can do its job. The plugin generates `Message-ID:` headers locally so they align with the MTA-rewritten `From:` (no `@localhost` fallback).
 
 > **What about the From: address?** WPMU DEV's Postfix rewrite rule `*@* noreply@yourwpsite.email Ffs` rewrites three things on every outgoing message: the visible `From:` header, the envelope sender, and the `Sender:` header. All outgoing mail will show as coming from `noreply@yourwpsite.email`, regardless of anything the plugin does. This is by design — it guarantees SPF / DKIM alignment with the relay. If you need a different sender address, ask your hosting support; it isn't something the plugin can override.
 

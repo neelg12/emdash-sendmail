@@ -18,10 +18,18 @@
  * No address config, no transport modes, no validation — because none of
  * it would change the bytes that hit the recipient's inbox on this host.
  */
+import { randomUUID } from "node:crypto";
 import { definePlugin } from "emdash";
 import type { PluginContext } from "emdash";
 import nodemailer from "nodemailer";
 import type { EmailDeliverEvent, SendmailPluginOptions } from "./types.js";
+
+/**
+ * Default Message-ID domain — matches WPMU DEV's MTA rewrite target so
+ * generated Message-IDs visually align with the rewritten `From:` header.
+ * Overridable via `sendmailPlugin({ messageIdDomain: "..." })`.
+ */
+const DEFAULT_MESSAGE_ID_DOMAIN = "yourwpsite.email";
 
 /**
  * Build the transport plugin. Called by EmDash at runtime via:
@@ -30,6 +38,8 @@ import type { EmailDeliverEvent, SendmailPluginOptions } from "./types.js";
  */
 export function createPlugin(options: SendmailPluginOptions = {}) {
   const sendmailPath = options.sendmailPath ?? "/usr/sbin/sendmail";
+  const messageIdDomain =
+    options.messageIdDomain ?? DEFAULT_MESSAGE_ID_DOMAIN;
 
   // Construct the nodemailer transporter once at plugin load. Cheap — no
   // process is spawned until sendMail() is invoked.
@@ -41,14 +51,16 @@ export function createPlugin(options: SendmailPluginOptions = {}) {
 
   return definePlugin({
     id: "sendmail-transport",
-    version: "0.3.1",
+    version: "1.0.0",
     capabilities: ["hooks.email-transport:register"],
 
     hooks: {
       "plugin:activate": {
         handler: async (_event: unknown, ctx: PluginContext) => {
           ctx.log.info(
-            `[emdash-sendmail] activated (sendmailPath="${sendmailPath}")`,
+            `[emdash-sendmail] activated ` +
+              `(sendmailPath="${sendmailPath}", ` +
+              `messageIdDomain="${messageIdDomain}")`,
           );
         },
       },
@@ -61,11 +73,18 @@ export function createPlugin(options: SendmailPluginOptions = {}) {
         handler: async (event: EmailDeliverEvent, ctx: PluginContext) => {
           const { message, source } = event;
 
+          // Generate a clean Message-ID against the configured domain so
+          // headers visually align with the MTA-rewritten From:. Nodemailer
+          // would otherwise fall back to `<uuid@localhost>` because we
+          // (correctly) don't pass a `from`.
+          const messageId = `<${randomUUID()}@${messageIdDomain}>`;
+
           try {
             const info = await transporter.sendMail({
               to: message.to,
               subject: message.subject,
               text: message.text,
+              messageId,
               ...(message.html ? { html: message.html } : {}),
               // Intentionally no `from`: the host MTA rewrites From: /
               // envelope-sender / Sender: to `noreply@yourwpsite.email`
@@ -78,7 +97,7 @@ export function createPlugin(options: SendmailPluginOptions = {}) {
                 `to="${message.to}" ` +
                 `subject="${message.subject}" ` +
                 `source="${source}" ` +
-                `messageId="${info.messageId ?? "<none>"}"`,
+                `messageId="${info.messageId ?? messageId}"`,
             );
           } catch (e) {
             const err = e as Error & { code?: string };

@@ -1,5 +1,5 @@
 import * as emdash from 'emdash';
-import { S as SendmailPluginOptions } from './types-wtOVrDoM.js';
+import { S as SendmailPluginOptions } from './types-Ce83_7cM.js';
 
 /**
  * Build the transport plugin. Called by EmDash at runtime via:

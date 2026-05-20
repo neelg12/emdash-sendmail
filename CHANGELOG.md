@@ -5,6 +5,30 @@ All notable changes to `@incsub/emdash-sendmail` (maintained by [WPMU DEV](https
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-05-20
+
+**Production release.** The plugin has been verified end-to-end on WPMU DEV Hosting (`emdash@0.11.1` + `@emdash-cms/template-portfolio@0.0.3`). A real test email round-tripped through `/usr/sbin/sendmail` → Postfix (`Ffs` header rewrite to `noreply@yourwpsite.email`) → MailChannels → Gmail with **SPF pass, DKIM pass, and DMARC pass (`p=REJECT`, strict)**. No deliverability blemishes.
+
+### Added
+
+- **`messageIdDomain` option** (default `"yourwpsite.email"`). The plugin now generates `Message-ID:` headers locally using this domain instead of letting nodemailer fall back to `<uuid@localhost>`. The MTA rewrite rule (`Ffs`) doesn't touch `Message-ID`, so what we generate is what recipients see. Generated IDs are RFC-compliant UUIDs.
+
+### Changed
+
+- **Bumped to 1.0.0** to signal API stability. The configuration surface (two optional fields: `sendmailPath`, `messageIdDomain`) is now considered locked. Future 1.x releases will not remove or rename options.
+- Activation log now also records `messageIdDomain` for operator visibility.
+
+### Migration from 0.3.x
+
+No required changes. Bump the dependency and Rebuild:
+
+```diff
+- "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v0.3.1"
++ "@incsub/emdash-sendmail": "github:neelg12/emdash-sendmail#v1.0.0"
+```
+
+`astro.config.mjs` keeps reading `sendmailPlugin()` — no args needed on standard WPMU DEV setups.
+
 ## [0.3.1] — 2026-05-20
 
 ### Fixed
@@ -57,6 +81,7 @@ Pre-release. Introduced `forceFrom`, `messageIdDomain`, startup validation, and 
 
 Initial release. Sendmail + SMTP transports with `defaultFrom` option. Superseded by 0.3.0.
 
+[1.0.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v1.0.0
 [0.3.1]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.3.1
 [0.3.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.3.0
 [0.2.0]: https://github.com/neelg12/emdash-sendmail/releases/tag/v0.2.0

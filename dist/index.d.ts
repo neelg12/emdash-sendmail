@@ -1,5 +1,5 @@
 import { PluginDescriptor } from 'emdash';
-import { S as SendmailPluginOptions } from './types-wtOVrDoM.js';
+import { S as SendmailPluginOptions } from './types-Ce83_7cM.js';
 
 /**
  * Build the EmDash plugin descriptor for the WPMU DEV sendmail transport.
